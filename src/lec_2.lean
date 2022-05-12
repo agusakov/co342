@@ -3,22 +3,26 @@ Copyright (c) 2022 Alena Gusakov. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alena Gusakov
 -/
+import data.sym.sym2
 import combinatorics.simple_graph.basic
 import combinatorics.simple_graph.subgraph
 import combinatorics.simple_graph.connectivity
 import data.list
 /-!
 
-# Graph Vertex and Edge Connectivity
+# Edge Connectivity
 
 In a simple graph, blah blah
+
+* for edges as first-class objects, maybe we can have a nontrivial type thing on V to specify when there are at least 2 vertices?
+* I think that would make things easier.
 
 -/
 
 universes u v
 
 namespace simple_graph
-variables {V : Type u} {V' : Type v} [decidable_eq V] [fintype V] [nonempty V]
+variables {V : Type u} {V' : Type v} [decidable_eq V] [fintype V] [nontrivial V]
 variables (G : simple_graph V) (G' : simple_graph V') [decidable_rel G.adj]
 
 
@@ -40,10 +44,8 @@ begin
   exact h2,
 end
 
-lemma min_deg_ne_zero_of_connected (h : G.connected) (h2 : 1 < fintype.card V): G.min_degree ≠ 0 :=
+lemma min_deg_ne_zero_of_connected [nontrivial V] (h2 : 1 < fintype.card V) : G.connected ↔ G.min_degree ≠ 0 :=
 begin
-  -- again we have the weird situation where a single vertex is the exception
-  -- some kind of nonempty E declaration perhaps?
   have hv := G.exists_minimal_degree_vertex,
   cases hv with v hv,
   rw fintype.one_lt_card_iff at h2,
@@ -106,8 +108,10 @@ begin
     cases h3 with h3 h5,
     specialize h3 sorry,
     cases h3 with w hw,
-    
-    sorry },
+    by_contra h4,
+    cases h4 with h4 h5,
+    apply G.delete_incident_edges_not_preconnected v sorry,
+    exact h4 },
   specialize h2 (G.incidence_finset v),
   specialize h2 sorry,
   contrapose h2,
@@ -118,6 +122,37 @@ begin
   exact ⟨h2, h⟩,
 end
 
+/--
+For a set S ⊆ V(G), the cut induced by S (or just a cut) is the set of all edges with one end in S
+and one end not in S, denoted by cut G(S) or cut(S).  
+-/
+def edge_cut (S : set V) : set (sym2 V) := {e ∈ G.edge_set | ∃ (v : V) (h : v ∈ e), v ∈ S ∧ sym2.mem.other h ∉ S}
+-- why did i have to specify sym2.mem in order to make it work? i can't find the namespace declaration
 
+/--
+Lemma 2.6 (Cut criterion for connectivity, Math 239). A graph is connected if and only if every nontrivial cut is nonempty
+-/
+lemma cut_criterion : G.connected ↔ ∀ (S : set V), set.nonempty S ∧ S ≠ set.univ → set.nonempty (G.edge_cut S) :=
+begin
+  split,
+  { rintros ⟨hpre, hnon⟩ S ⟨hne, hna⟩,
+    cases hne with v hv,
+    rw set.ne_univ_iff_exists_not_mem at hna,
+    cases hna with w hna,
+    specialize hpre v w,
+    cases hpre with w, 
+    -- need to show that at some point there is an edge in w that has an endpoint in S and another endpoint not in S
+    have h : ∃ e ∈ w.edges, e ∈ G.edge_cut S,
+    { unfold edge_cut,
+      simp,
+      sorry },
+    rcases h with ⟨e, ⟨he, he2⟩⟩,
+    use ⟨e, he2⟩ },
+  { rintros h,
+    split,
+    intros v w,
+    --specialize h {v} sorry,
+    sorry },
+end
 
 end simple_graph
